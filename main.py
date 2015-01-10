@@ -162,31 +162,67 @@ class Map(object):
 			self.passengers.append(p)
 			self.map[x][y] = p
 
+	def __cmp__(self, p1, p2):
+		vp1 = p1.x + p1.y * self.mapWidth
+		vp2 = p2.x + p2.y * self.mapWidth
+		if vp1 < vp2:
+			return -1
+		elif vp1 > vp2:
+			return 1
+		else:
+			return 0 
+
 	def next(self):
 		for p in self.passengers:
 			p.move(self.map)
 		
 		#collision detect
-		h = [(p.x + p.y * self.mapWidth, p) for p in self.passengers] #heap
-		heapify(h)
-		pInSameCell = []
-		while len(h) > 0:
-			while True:
-				p = heappop(h)
-				if pInSameCell == []: #pInSameCell is empty, add it 
-					pInSameCell.append(p)
-				elif pInSameCell[0][0] == p[0]: #p is in the same cell, add it
-					pInSameCell.append(p)
-				else: # p is not in the same cell 
-					if len(pInSameCell) == 1: #only one p in the cell, not collide
-						del pInSameCell[0]
-						pInSameCell.append(p)
-					else: #collide
-						
-
-		
+		h = self.passengers[:]
+		while True:
+			if len(h) <= 1: #only one passenger
+				break
+			h.sort(cmp = self.__cmp__)
+			for i in xrange(len(h)):
+				for j in xrange(i + 1, len(h)):
+					if self.__cmp__(h[i], h[j]) == 0:
+						continue
+					else:
+						break
+				#i start index, j index of first different element
+				#j may not exists
+				if 'j' not in dir(): # i is at the end of array
+					continue 
+				if j - i <= 1: #no collision
+					continue
+				else:
+					#if there is an element not moved, undo other elements
+					for k in xrange(i, j):
+						if h[k].lx == h[k].x and h[k].ly == h[k].ly:
+							for l in xrange(i, j):
+								if l is not k:
+									h[l].undoMove()
+							break
+					else:#pick an element randomly to take the cell, undo all other elements, break 
+						try:
+							k = random.sample(range(i, j), 1)
+						except ValueError:
+							print 'i = %s, j = %s' %(i, j)
+							sys.exit()
+						for l in xrange(i, j):
+							if l is not k:
+								h[l].undoMove()
+					break
+			else: #no collision
+				break
 		#location exchange detect
-
+		pass
+		
+		#confirm move
+		del h
+		for p in self.passengers:
+			p.confirmMove()
+			
+		#update map
 		for c in self.map:
 			for i in xrange(len(c)):
 				c[i] = 0
@@ -203,7 +239,7 @@ class Map(object):
 			print ''
 
 def main():
-	m = Map(5, 5, 10, 20)
+	m = Map(5, 5, 5, 5)
 	
 	for i in range(5):
 		m.show()
