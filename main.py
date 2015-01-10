@@ -2,6 +2,8 @@
 import random 
 import sys
 import time
+from heapq import heapify, heappush, heappop
+
 class Passenger(object):
 	"""Passenger
 	AdjacentCell:
@@ -12,7 +14,6 @@ class Passenger(object):
 		up 1
 		down -1
 	"""
-
 	def __init__(self, x, y, direction, alpha):		
 		super(Passenger, self).__init__()
 		self.x = self.lx = x
@@ -93,7 +94,8 @@ class Passenger(object):
 		
 		P = [self.alpha * (D[i] + E[i]) + (1 - self.alpha) * (F[i] + C[i]) for i in xrange(9)] #profile-value
 		
-		nextCell = P.index(max(P))
+		nextCell = random.sample([i for i in xrange(9) if P[i] == max(P)], 1)[0] #randomly pick a cell with the maximal P 
+			
 		dx = nextCell % 3 - 1
 		dy = -1 * (nextCell / 3 - 1)
 		self.x = self.x + dx
@@ -163,8 +165,28 @@ class Map(object):
 	def next(self):
 		for p in self.passengers:
 			p.move(self.map)
-		pass
-		#continue
+		
+		#collision detect
+		h = [(p.x + p.y * self.mapWidth, p) for p in self.passengers] #heap
+		heapify(h)
+		pInSameCell = []
+		while len(h) > 0:
+			while True:
+				p = heappop(h)
+				if pInSameCell == []: #pInSameCell is empty, add it 
+					pInSameCell.append(p)
+				elif pInSameCell[0][0] == p[0]: #p is in the same cell, add it
+					pInSameCell.append(p)
+				else: # p is not in the same cell 
+					if len(pInSameCell) == 1: #only one p in the cell, not collide
+						del pInSameCell[0]
+						pInSameCell.append(p)
+					else: #collide
+						
+
+		
+		#location exchange detect
+
 		for c in self.map:
 			for i in xrange(len(c)):
 				c[i] = 0
@@ -177,7 +199,7 @@ class Map(object):
 				if self.map[j][i] == 0:
 					sys.stdout.write('0 ')
 				else:
-					sys.stdout.write('%s ' %self.map[j][i].direction)
+					sys.stdout.write('%s ' % self.map[j][i].direction)
 			print ''
 
 def main():
