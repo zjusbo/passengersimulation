@@ -6,6 +6,7 @@ from heapq import heapify, heappush, heappop
 import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib import animation
+import pdb
 
 class Passenger(object):
 	"""Passenger
@@ -42,7 +43,7 @@ class Passenger(object):
 			nx = self.x + dx
 			ny = self.correctY(self.y + dy, mapHeight)
 			if dx == 0 and dy == 0: #current cell
-				E[4] = 0
+				E[i] = 0
 			elif nx < 0 or nx >=  mapWidth: #next cell is out of boundary
 				E[i] = float('-inf')
 			elif thisMap[nx][ny] == 0: #next cell is empty
@@ -70,7 +71,7 @@ class Passenger(object):
 				else: #current cell is occupied
 					S2 += 1
 			sizeOfViewMap = len(viewMap)
-			F[i] = (S1 - S2) / sizeOfViewMap
+			F[i] = float((S1 - S2)) / sizeOfViewMap
 
 		C = [0] * 9 #Category-parameter
 		for i in xrange(9):
@@ -84,16 +85,17 @@ class Passenger(object):
 				continue
 
 			viewMap = self.setViewMap(nx, ny, thisMap)
-			S1 = S2 = 0
+			S1 = 0 
+			S2 = 0
 			for c in viewMap:
-				if c == 0:
+				if c == 0: #cell is empty
 					S1 += 1
 				elif c.direction == self.direction:
 					S1 += 1
 				else:
 					S2 += 1
 			sizeOfViewMap = len(viewMap)
-			C[i] = (S1 - S2) / sizeOfViewMap
+			C[i] = float((S1 - S2)) / sizeOfViewMap
 		
 		P = [self.alpha * (D[i] + E[i]) + (1 - self.alpha) * (F[i] + C[i]) for i in xrange(9)] #profile-value
 		
@@ -182,6 +184,7 @@ class Map(object):
 			raise ValueError, 'Step Interval Illegal'
 		self.stepInterval = v
 		self.framesPerStep = self.stepInterval / self.frameInterval
+
 	def __cmp__(self, p1, p2):
 		vp1 = p1.x + p1.y * self.mapWidth
 		vp2 = p2.x + p2.y * self.mapWidth
@@ -202,49 +205,11 @@ class Map(object):
 			p.move(self.map)
 		
 		#collision detect
-		h = self.passengers[:]
-		while True:
-			if len(h) <= 1: #only one passenger
-				break
-			h.sort(cmp = self.__cmp__)
-			for i in xrange(len(h)):
-				for j in xrange(i + 1, len(h)):
-					if self.__cmp__(h[i], h[j]) == 0:
-						continue
-					else:
-						break
-				#i start index, j index of first different element
-				#j may not exists
-				if 'j' not in dir(): # i is at the end of array
-					continue 
-				if j - i <= 1: #no collision
-					continue
-				else:
-					#if there is an element not moved, undo other elements
-					for k in xrange(i, j):
-						if h[k].lx == h[k].x and h[k].ly == h[k].ly:
-							for l in xrange(i, j):
-								if l is not k:
-									h[l].undoMove()
-							break
-					else:#pick an element randomly to take the cell, undo all other elements, break 
-						try:
-							k = random.sample(range(i, j), 1)
-						except ValueError:
-							print 'i = %s, j = %s' %(i, j)
-							sys.exit()
-						for l in xrange(i, j):
-							if l is not k:
-								h[l].undoMove()
-					break
-			else: #no collision
-				break
+		self.collisionDetect()
+
 		#location exchange detect
 		pass
-		
-		#free memory
-		del h
-		
+				
 		#update map
 		for c in self.map:
 			for i in xrange(len(c)):
@@ -252,6 +217,53 @@ class Map(object):
 		for p in self.passengers:
 			self.map[p.x][p.y] = p
 
+	def collisionDetect(self):
+		#pdb.set_trace()
+		h = self.passengers[:]
+		while True:
+			isCollision = False
+			if len(h) <= 1: #only one passenger
+				break
+			h.sort(cmp = self.__cmp__)
+			for i in xrange(len(h) - 1):
+				for j in xrange(i + 1, len(h)):
+					if self.__cmp__(h[i], h[j]) != 0:
+						break
+				#i start index, j index of first different element
+				if j == len(h) - 1 and self.__cmp__(h[i], h[j]) == 0:
+					j += 1
+				if j - i == 1:
+					continue
+				else:
+					isCollision = True
+					#if there is an element not moved, undo other elements
+					for k in xrange(i, j):
+						#pdb.set_trace()
+						if h[k].lx == h[k].x and h[k].ly == h[k].y:
+							for l in xrange(i, j):
+								if l != k:
+									h[l].undoMove()
+							break
+					else:#pick an element randomly to take the cell, undo all other elements, break 
+						k = random.sample(range(i, j), 1)[0]
+						for l in xrange(i, j):
+							if l != k:
+								h[l].undoMove()
+					break
+			if isCollision == False: #no collision
+				break
+
+		for i in range(len(self.passengers)):
+			for j in xrange(i + 1, len(self.passengers)):
+				if self.passengers[i].x == self.passengers[j].x and self.passengers[i].y == self.passengers[j].y:
+					for p in h:
+						sys.stdout.write('(%s, %s) ' % (p.x, p.y))
+					print ''
+					pdb.set_trace()
+					print 'Collision at (%s, %s)' %(self.passengers[i].x, self.passengers[i].y)
+
+		#free memory
+		del h
 	def _show(self):
 		'''deprecated'''
 		for i in xrange(self.mapHeight - 1, -1, -1):
@@ -276,12 +288,8 @@ class Map(object):
 		f = self.framesPerStep
 		if i % f == 0:
 			self.next()
-			# for i, p in enumerate(self.passengers):
-			# 	print '%s: (%s, %s)->(%s, %s)' % (i, p.lx, p.ly, p.x, p.y)
 		ux = [p.lx + (p.x - p.lx) * (float(i % f) / f) for p in self.passengers if p.direction == 1]
-		#uy = [p.ly + (p.y - p.ly) * (float(i % f) / f) for p in self.passengers if p.direction == 1]
 		dx = [p.lx + (p.x - p.lx) * (float(i % f) / f) for p in self.passengers if p.direction == -1]
-		#dy = [p.ly + (p.y - p.ly) * (float(i % f) / f) for p in self.passengers if p.direction == -1]
 		uy = []
 		dy = []
 		for p in self.passengers: 
@@ -317,8 +325,8 @@ class Map(object):
 def main():
 	m = Map(5, 5, 5, 5)
 	m.setFrameInterval(50)
-	m.setStepInterval(1000)
-	anim = animation.FuncAnimation(m.fig, m.animate, init_func = m.ani_init, frames = 200, interval = m.frameInterval, blit = True)
+	m.setStepInterval(500)
+	anim = animation.FuncAnimation(m.fig, m.animate, init_func = m.ani_init, frames = 2000, interval = m.frameInterval, blit = True)
 	# for i in range(1):
 	# 	m.show()
 	# 	print ''
