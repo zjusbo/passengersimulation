@@ -3,6 +3,9 @@ import random
 import sys
 import time
 from heapq import heapify, heappush, heappop
+import numpy as np
+from matplotlib import pyplot as plt
+from matplotlib import animation
 
 class Passenger(object):
 	"""Passenger
@@ -135,7 +138,7 @@ class Passenger(object):
 
 class Map(object):
 	"""docstring for PassengerManager"""
-	def __init__(self, numOfUpPassenger, numOfDownPassenger, mapWidth, mapHeight):
+	def __init__(self, numOfUpPassenger, numOfDownPassenger, mapWidth, mapHeight, frameInterval = 50, stepInterval = 1000):
 		super(Map, self).__init__()
 		self.numOfUpPassenger = numOfUpPassenger
 		self.numOfDownPassenger = numOfDownPassenger
@@ -143,10 +146,16 @@ class Map(object):
 		self.mapHeight = mapHeight
 		self.mapSize = self.mapWidth * self.mapHeight
 		self.totalPassenger = numOfDownPassenger + numOfUpPassenger
+		self.frameInterval = frameInterval
+		self.stepInterval = stepInterval
+		self.framesPerStep = self.stepInterval / self.frameInterval
 		if self.totalPassenger > self.mapSize:
 			raise ValueError, 'too many passengers!' 
 		self.passengers = []
 
+		self.fig = plt.figure()
+		plt.axis([-1, self.mapWidth, -1, self.mapHeight])
+		self.udots, self.ddots= plt.plot([], [], '^r', [], [], '*b')
 		passengerCoordinates = random.sample(range(self.mapSize), self.totalPassenger)
 		self.map = [[0] * self.mapHeight for x in xrange(self.mapWidth)]
 		for i in xrange(self.totalPassenger):
@@ -162,6 +171,17 @@ class Map(object):
 			self.passengers.append(p)
 			self.map[x][y] = p
 
+	def setFrameInterval(self, v):
+		if v <= 0:
+			raise ValueError, 'Frame Interval Illegal'
+		self.frameInterval = v
+		self.framesPerStep = self.stepInterval / self.frameInterval
+
+	def setStepInterval(self, v):
+		if v <= 0:
+			raise ValueError, 'Step Interval Illegal'
+		self.stepInterval = v
+		self.framesPerStep = self.stepInterval / self.frameInterval
 	def __cmp__(self, p1, p2):
 		vp1 = p1.x + p1.y * self.mapWidth
 		vp2 = p2.x + p2.y * self.mapWidth
@@ -173,6 +193,11 @@ class Map(object):
 			return 0 
 
 	def next(self):
+		#confirm last move
+		for p in self.passengers:
+			p.confirmMove()
+		
+		#move
 		for p in self.passengers:
 			p.move(self.map)
 		
@@ -217,11 +242,9 @@ class Map(object):
 		#location exchange detect
 		pass
 		
-		#confirm move
+		#free memory
 		del h
-		for p in self.passengers:
-			p.confirmMove()
-			
+		
 		#update map
 		for c in self.map:
 			for i in xrange(len(c)):
@@ -229,7 +252,8 @@ class Map(object):
 		for p in self.passengers:
 			self.map[p.x][p.y] = p
 
-	def show(self):
+	def _show(self):
+		'''deprecated'''
 		for i in xrange(self.mapHeight - 1, -1, -1):
 			for j in xrange(self.mapWidth):
 				if self.map[j][i] == 0:
@@ -238,14 +262,68 @@ class Map(object):
 					sys.stdout.write('%s ' % self.map[j][i].direction)
 			print ''
 
+	def show(self):
+		ux = [p.x for p in self.passengers if p.direction == 1]
+		uy = [p.y for p in self.passengers if p.direction == 1]
+		dx = [p.x for p in self.passengers if p.direction == -1]
+		dy = [p.y for p in self.passengers if p.direction == -1]
+		plt.style.use('bmh')
+		plt.plot(ux, uy, 'r^', dx, dy, 'g*')
+		plt.axis([-1, self.mapWidth, -1, self.mapHeight])
+		plt.show()
+
+	def animate(self, i):
+		f = self.framesPerStep
+		if i % f == 0:
+			self.next()
+			# for i, p in enumerate(self.passengers):
+			# 	print '%s: (%s, %s)->(%s, %s)' % (i, p.lx, p.ly, p.x, p.y)
+		ux = [p.lx + (p.x - p.lx) * (float(i % f) / f) for p in self.passengers if p.direction == 1]
+		#uy = [p.ly + (p.y - p.ly) * (float(i % f) / f) for p in self.passengers if p.direction == 1]
+		dx = [p.lx + (p.x - p.lx) * (float(i % f) / f) for p in self.passengers if p.direction == -1]
+		#dy = [p.ly + (p.y - p.ly) * (float(i % f) / f) for p in self.passengers if p.direction == -1]
+		uy = []
+		dy = []
+		for p in self.passengers: 
+			if p.direction == 1: # up passengers
+				if p.y - p.ly < 0: # leave boundary and enter boundary
+					offset = 1 * (float(i % f) / f)
+					if offset > 0.5: # entering boundary
+						thisy = -0.5 + offset - 0.5
+					else: # leaving boundary
+						thisy = p.ly + offset
+				else: # within boundary
+					thisy = p.ly + (p.y - p.ly) * (float(i % f) / f)
+				uy.append(thisy)
+			elif p.direction == -1: # down passengers
+				if p.y - p.ly > 0: # leave boundary and enter boundary
+					offset = 1 * (float(i % f) / f)
+					if offset > 0.5: # entering boundary
+						thisy = self.mapHeight - offset 
+					else: # leaving boundary
+						thisy = p.ly - offset
+				else: # within boundary
+					thisy = p.ly + (p.y - p.ly) * (float(i % f) / f)
+				dy.append(thisy)
+		self.udots.set_data(ux, uy)
+		self.ddots.set_data(dx, dy)
+		return self.udots, self.ddots
+
+	def ani_init(self):
+		self.udots.set_data([], [])
+		self.ddots.set_data([], [])
+		return self.udots, self.ddots
+
 def main():
 	m = Map(5, 5, 5, 5)
-	
-	for i in range(5):
-		m.show()
-		print ''
-		time.sleep(1)
-		m.next()
-
+	m.setFrameInterval(50)
+	m.setStepInterval(1000)
+	anim = animation.FuncAnimation(m.fig, m.animate, init_func = m.ani_init, frames = 200, interval = m.frameInterval, blit = True)
+	# for i in range(1):
+	# 	m.show()
+	# 	print ''
+	# 	time.sleep(1)
+	# 	m.next()
+	plt.show()
 if __name__ == '__main__':
 	main()
