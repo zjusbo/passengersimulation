@@ -26,6 +26,10 @@ class Passenger(object):
 		self.direction = direction
 	
 	def move(self, thisMap):
+		if self.x != self.lx or self.ly != self.y:
+			print 'move not confirmed'
+			pdb.set_trace()
+
 		mapWidth = len(thisMap)
 		mapHeight = len(thisMap[0])
 
@@ -105,7 +109,10 @@ class Passenger(object):
 		dy = -1 * (nextCell / 3 - 1)
 		self.x = self.x + dx
 		self.y = self.correctY(self.y + dy, mapHeight)
-
+		# if (self.y - self.ly > 1 and self.direction == 1) or (self.y - self.ly < -1 and self.direction == -1):
+		# 	print 'in move()_ (%s, %s)->(%s, %s)' % (self.lx, self.ly, self.x, self.y)
+		# 	pdb.set_trace()
+		# To be debugged.
 	def correctY(self, y, mapHeight):
 		if y >= 0 and y < mapHeight:
 			return y
@@ -155,9 +162,13 @@ class Map(object):
 			raise ValueError, 'too many passengers!' 
 		self.passengers = []
 
-		self.fig = plt.figure()
+		self.fig, self.ax = plt.subplots(1, 1)
+		self.ax.grid(b = True, which = 'major')
+		self.ax.grid(b = True, which = 'minor')
+		self.ax.set_yticks(range(-1, self.mapHeight), minor = True)
+		self.ax.set_xticks(range(-1, self.mapWidth), minor = True)
 		plt.axis([-1, self.mapWidth, -1, self.mapHeight])
-		self.udots, self.ddots= plt.plot([], [], '^r', [], [], '*b')
+		self.udots, self.ddots= plt.plot([], [], '^r', [], [], '*b', markersize = 10)
 		passengerCoordinates = random.sample(range(self.mapSize), self.totalPassenger)
 		self.map = [[0] * self.mapHeight for x in xrange(self.mapWidth)]
 		for i in xrange(self.totalPassenger):
@@ -205,17 +216,66 @@ class Map(object):
 			p.move(self.map)
 		
 		#collision detect
-		self.collisionDetect()
+		while True:
+			collideCells = self.isCollide()
+			if collideCells == []:
+				break
+			else:
+				# find unmoved Passenger in collide cells
+				unmovedP = []
+				for p in collideCells:
+					if p.lx == p.x and p.ly == p.y:
+						unmovedP = p
+						break
+				if unmovedP != []:
+					for p in collideCells:
+						if p != unmovedP:
+							p.undoMove()
+				else: # no unmoved passengers
+					r = random.sample(range(len(collideCells)), 1)[0]
+					for idx, p in enumerate(collideCells):
+						if r != idx:
+							p.undoMove()
+
+
+
+		#self.collisionDetect()
 
 		#location exchange detect
 		pass
-				
+		
+		#testing area
+		for i in range(len(self.passengers)):
+			for j in xrange(i + 1, len(self.passengers)):
+				if self.passengers[i].x == self.passengers[j].x and self.passengers[i].y == self.passengers[j].y:
+					for p in h:
+						sys.stdout.write('(%s, %s) ' % (p.x, p.y))
+					print ''
+					pdb.set_trace()
+					print 'Collision at (%s, %s)' %(self.passengers[i].x, self.passengers[i].y)
+
+		# for p in self.passengers:
+		# 	if (p.y - p.ly > 1 and p.direction == 1) or (p.y - p.ly < -1 and p.direction == -1):
+		# 		print '(%s, %s)->(%s, %s)' % (p.lx, p.ly, p.x, p.y)
+		# 		pdb.set_trace()
+
 		#update map
 		for c in self.map:
 			for i in xrange(len(c)):
 				c[i] = 0
 		for p in self.passengers:
 			self.map[p.x][p.y] = p
+
+	def isCollide(self):
+		r = []
+		for p in self.passengers:
+			for q in self.passengers:
+				if p != q and p.x == q.x and p.y == q.y:
+					r.append(q)
+			if r != []:
+				r.append(p)
+				return r
+		return []
 
 	def collisionDetect(self):
 		#pdb.set_trace()
@@ -293,26 +353,41 @@ class Map(object):
 		uy = []
 		dy = []
 		for p in self.passengers: 
-			if p.direction == 1: # up passengers
-				if p.y - p.ly < 0: # leave boundary and enter boundary
-					offset = 1 * (float(i % f) / f)
-					if offset > 0.5: # entering boundary
-						thisy = -0.5 + offset - 0.5
-					else: # leaving boundary
-						thisy = p.ly + offset
-				else: # within boundary
-					thisy = p.ly + (p.y - p.ly) * (float(i % f) / f)
+			if p.y == 0 and p.ly == self.mapHeight - 1: # touch the ceiling
+				thisy = p.ly + float(i % f) / f * 1
+				if thisy > self.mapHeight - 0.5:
+					thisy = thisy - (self.mapHeight - 1)
+			elif p.y == self.mapHeight - 1 and p.ly == 0: # touch the bottom
+				thisy = p.ly + float(i % f) / f * -1
+				if thisy < 0.5:
+					thisy = thisy + self.mapHeight - 1
+			else: # normal scenario 
+				thisy = p.ly + float(i % f) / f * (p.y - p.ly)
+			if p.direction == 1:
 				uy.append(thisy)
-			elif p.direction == -1: # down passengers
-				if p.y - p.ly > 0: # leave boundary and enter boundary
-					offset = 1 * (float(i % f) / f)
-					if offset > 0.5: # entering boundary
-						thisy = self.mapHeight - offset 
-					else: # leaving boundary
-						thisy = p.ly - offset
-				else: # within boundary
-					thisy = p.ly + (p.y - p.ly) * (float(i % f) / f)
+			else:
 				dy.append(thisy)
+
+			# if p.direction == 1: # up passengers
+			# 	if p.y - p.ly < 0: # leave boundary and enter boundary
+			# 		offset = 1 * (float(i % f) / f)
+			# 		if offset > 0.5: # entering boundary
+			# 			thisy = -0.5 + offset - 0.5
+			# 		else: # leaving boundary
+			# 			thisy = p.ly + offset
+			# 	else: # within boundary
+			# 		thisy = p.ly + (p.y - p.ly) * (float(i % f) / f)
+			# 	uy.append(thisy)
+			# elif p.direction == -1: # down passengers
+			# 	if p.y - p.ly > 0: # leave boundary and enter boundary
+			# 		offset = 1 * (float(i % f) / f)
+			# 		if offset > 0.5: # entering boundary
+			# 			thisy = self.mapHeight - offset 
+			# 		else: # leaving boundary
+			# 			thisy = p.ly - offset
+			# 	else: # within boundary
+			# 		thisy = p.ly + (p.y - p.ly) * (float(i % f) / f)
+			# 	dy.append(thisy)
 		self.udots.set_data(ux, uy)
 		self.ddots.set_data(dx, dy)
 		return self.udots, self.ddots
@@ -323,10 +398,10 @@ class Map(object):
 		return self.udots, self.ddots
 
 def main():
-	m = Map(5, 5, 5, 5)
+	m = Map(40, 30, 10, 10)
 	m.setFrameInterval(50)
 	m.setStepInterval(500)
-	anim = animation.FuncAnimation(m.fig, m.animate, init_func = m.ani_init, frames = 2000, interval = m.frameInterval, blit = True)
+	anim = animation.FuncAnimation(m.fig, m.animate, init_func = m.ani_init, frames = None, interval = m.frameInterval, blit = True)
 	# for i in range(1):
 	# 	m.show()
 	# 	print ''
