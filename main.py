@@ -110,10 +110,6 @@ class Passenger(object):
 		dy = -1 * (nextCell / 3 - 1)
 		self.x = self.x + dx
 		self.y = self.correctY(self.y + dy, mapHeight)
-		# if (self.y - self.ly > 1 and self.direction == 1) or (self.y - self.ly < -1 and self.direction == -1):
-		# 	print 'in move()_ (%s, %s)->(%s, %s)' % (self.lx, self.ly, self.x, self.y)
-		# 	pdb.set_trace()
-		# To be debugged.
 
 	def correctY(self, y, mapHeight):
 		if y >= 0 and y < mapHeight:
@@ -149,7 +145,7 @@ class Passenger(object):
 
 class Map(object):
 	"""docstring for PassengerManager"""
-	def __init__(self, numOfUpPassenger, numOfDownPassenger, mapWidth, mapHeight, frameInterval = 50, stepInterval = 1000):
+	def __init__(self, numOfUpPassenger, numOfDownPassenger, mapWidth, mapHeight, frameInterval = 50, stepInterval = 1000, cangoback = True):
 		super(Map, self).__init__()
 		self.numOfUpPassenger = numOfUpPassenger
 		self.numOfDownPassenger = numOfDownPassenger
@@ -160,6 +156,7 @@ class Map(object):
 		self.frameInterval = frameInterval
 		self.stepInterval = stepInterval
 		self.framesPerStep = self.stepInterval / self.frameInterval
+		self.cangoback = cangoback
 		if self.totalPassenger > self.mapSize:
 			raise ValueError, 'too many passengers!' 
 		self.passengers = []
@@ -197,6 +194,9 @@ class Map(object):
 			raise ValueError, 'Step Interval Illegal'
 		self.stepInterval = v
 		self.framesPerStep = self.stepInterval / self.frameInterval
+
+	def canGoBack(self, bool):
+		self.cangoback = bool
 
 	def __cmp__(self, p1, p2):
 		vp1 = p1.x + p1.y * self.mapWidth
@@ -238,8 +238,6 @@ class Map(object):
 					for idx, p in enumerate(collideCells):
 						if r != idx:
 							p.undoMove()
-
-
 
 		#self.collisionDetect()
 
@@ -400,7 +398,7 @@ class Map(object):
 		return self.udots, self.ddots
 
 def main():
-	m = Map(40, 50, 10, 10)
+	m = Map(20, 15, 5, 10)
 	m.setFrameInterval(50)
 	m.setStepInterval(500)
 	anim = animation.FuncAnimation(m.fig, m.animate, init_func = m.ani_init, frames = None, interval = m.frameInterval, blit = True)
