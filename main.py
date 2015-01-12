@@ -53,6 +53,7 @@ class Passenger(object):
 			elif thisMap[nx][ny] == 0: #next cell is empty
 				E[i] = 1
 			else: #next cell is occupied
+				#E[i]  = float('-inf')
 				E[i]  = -1
 
 		F = [0] * 9 #Forward-parameter
@@ -113,6 +114,7 @@ class Passenger(object):
 		# 	print 'in move()_ (%s, %s)->(%s, %s)' % (self.lx, self.ly, self.x, self.y)
 		# 	pdb.set_trace()
 		# To be debugged.
+
 	def correctY(self, y, mapHeight):
 		if y >= 0 and y < mapHeight:
 			return y
@@ -245,14 +247,14 @@ class Map(object):
 		pass
 		
 		#testing area
-		for i in range(len(self.passengers)):
-			for j in xrange(i + 1, len(self.passengers)):
-				if self.passengers[i].x == self.passengers[j].x and self.passengers[i].y == self.passengers[j].y:
-					for p in h:
-						sys.stdout.write('(%s, %s) ' % (p.x, p.y))
+		for p in self.passengers:
+			for q in self.passengers:
+				if p != q and p.x == q.x and p.y == q.y:
+					for r in self.passengers:
+						sys.stdout.write('(%s, %s) ' % (r.x, r.y))
 					print ''
 					pdb.set_trace()
-					print 'Collision at (%s, %s)' %(self.passengers[i].x, self.passengers[i].y)
+					print 'Collision at (%s, %s)' %(p.x, p.y)
 
 		# for p in self.passengers:
 		# 	if (p.y - p.ly > 1 and p.direction == 1) or (p.y - p.ly < -1 and p.direction == -1):
@@ -356,11 +358,11 @@ class Map(object):
 			if p.y == 0 and p.ly == self.mapHeight - 1: # touch the ceiling
 				thisy = p.ly + float(i % f) / f * 1
 				if thisy > self.mapHeight - 0.5:
-					thisy = thisy - (self.mapHeight - 1)
+					thisy = thisy - self.mapHeight
 			elif p.y == self.mapHeight - 1 and p.ly == 0: # touch the bottom
 				thisy = p.ly + float(i % f) / f * -1
-				if thisy < 0.5:
-					thisy = thisy + self.mapHeight - 1
+				if thisy < -0.5:
+					thisy = thisy + self.mapHeight
 			else: # normal scenario 
 				thisy = p.ly + float(i % f) / f * (p.y - p.ly)
 			if p.direction == 1:
@@ -398,7 +400,7 @@ class Map(object):
 		return self.udots, self.ddots
 
 def main():
-	m = Map(40, 30, 10, 10)
+	m = Map(40, 50, 10, 10)
 	m.setFrameInterval(50)
 	m.setStepInterval(500)
 	anim = animation.FuncAnimation(m.fig, m.animate, init_func = m.ani_init, frames = None, interval = m.frameInterval, blit = True)
