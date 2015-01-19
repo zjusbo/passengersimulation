@@ -2,6 +2,9 @@
 import random 
 import sys
 import time
+import Tkinter
+import FileDialog
+import os
 from heapq import heapify, heappush, heappop
 import numpy as np
 from matplotlib import pyplot as plt
@@ -103,9 +106,14 @@ class Passenger(object):
 			C[i] = float((S1 - S2)) / sizeOfViewMap
 		
 		P = [self.alpha * (D[i] + E[i]) + (1 - self.alpha) * (F[i] + C[i]) for i in xrange(9)] #profile-value
+		#nextCell = random.sample([i for i in xrange(9) if P[i] == max(P)], 1)[0] #randomly pick a cell with the maximal P 
 		
-		nextCell = random.sample([i for i in xrange(9) if P[i] == max(P)], 1)[0] #randomly pick a cell with the maximal P 
-			
+		# only can move forward, left, right and don't move.
+		if self.direction == 1: # move up
+			nextCell = random.sample([i for i in [1, 3, 4, 5] if P[i] == max([P[1], P[3], P[4], P[5]])], 1)[0] #randomly pick a cell with the maximal P 
+		elif self.direction == -1: #move down
+			nextCell = random.sample([i for i in [7, 3, 4, 5] if P[i] == max([P[7], P[3], P[4], P[5]])], 1)[0] #randomly pick a cell with the maximal P 
+
 		dx = nextCell % 3 - 1
 		dy = -1 * (nextCell / 3 - 1)
 		self.x = self.x + dx
@@ -145,7 +153,7 @@ class Passenger(object):
 
 class Map(object):
 	"""docstring for PassengerManager"""
-	def __init__(self, numOfUpPassenger, numOfDownPassenger, mapWidth, mapHeight, frameInterval = 50, stepInterval = 1000, cangoback = True):
+	def __init__(self, numOfUpPassenger, numOfDownPassenger, mapWidth, mapHeight, markerSize, frameInterval = 50, stepInterval = 1000, cangoback = True):
 		super(Map, self).__init__()
 		self.numOfUpPassenger = numOfUpPassenger
 		self.numOfDownPassenger = numOfDownPassenger
@@ -167,7 +175,7 @@ class Map(object):
 		self.ax.set_yticks(range(-1, self.mapHeight), minor = True)
 		self.ax.set_xticks(range(-1, self.mapWidth), minor = True)
 		plt.axis([-1, self.mapWidth, -1, self.mapHeight])
-		self.udots, self.ddots= plt.plot([], [], '^r', [], [], '*b', markersize = 10)
+		self.udots, self.ddots= plt.plot([], [], '^r', [], [], '*b', markersize = markerSize)
 		passengerCoordinates = random.sample(range(self.mapSize), self.totalPassenger)
 		self.map = [[0] * self.mapHeight for x in xrange(self.mapWidth)]
 		for i in xrange(self.totalPassenger):
@@ -239,10 +247,13 @@ class Map(object):
 						if r != idx:
 							p.undoMove()
 
-		#self.collisionDetect()
-
 		#location exchange detect
-		pass
+		for p in self.passengers:
+			for q in self.passengers:
+				if p != q and p.x == q.lx and p.y == q.ly:
+					p.undoMove()
+					q.undoMove()
+					continue
 		
 		#testing area
 		for p in self.passengers:
@@ -254,17 +265,21 @@ class Map(object):
 					pdb.set_trace()
 					print 'Collision at (%s, %s)' %(p.x, p.y)
 
-		# for p in self.passengers:
-		# 	if (p.y - p.ly > 1 and p.direction == 1) or (p.y - p.ly < -1 and p.direction == -1):
-		# 		print '(%s, %s)->(%s, %s)' % (p.lx, p.ly, p.x, p.y)
-		# 		pdb.set_trace()
-
 		#update map
 		for c in self.map:
 			for i in xrange(len(c)):
 				c[i] = 0
 		for p in self.passengers:
 			self.map[p.x][p.y] = p
+
+		#calculate passenger average speed
+
+	def statistics(self):
+		count = 0
+		for p in self.passengers:
+			if p.lx == p.x and p.ly == p.y:
+				count += 1
+		return float(count) / self.totalPassenger
 
 	def isCollide(self):
 		r = []
@@ -277,53 +292,6 @@ class Map(object):
 				return r
 		return []
 
-	def collisionDetect(self):
-		#pdb.set_trace()
-		h = self.passengers[:]
-		while True:
-			isCollision = False
-			if len(h) <= 1: #only one passenger
-				break
-			h.sort(cmp = self.__cmp__)
-			for i in xrange(len(h) - 1):
-				for j in xrange(i + 1, len(h)):
-					if self.__cmp__(h[i], h[j]) != 0:
-						break
-				#i start index, j index of first different element
-				if j == len(h) - 1 and self.__cmp__(h[i], h[j]) == 0:
-					j += 1
-				if j - i == 1:
-					continue
-				else:
-					isCollision = True
-					#if there is an element not moved, undo other elements
-					for k in xrange(i, j):
-						#pdb.set_trace()
-						if h[k].lx == h[k].x and h[k].ly == h[k].y:
-							for l in xrange(i, j):
-								if l != k:
-									h[l].undoMove()
-							break
-					else:#pick an element randomly to take the cell, undo all other elements, break 
-						k = random.sample(range(i, j), 1)[0]
-						for l in xrange(i, j):
-							if l != k:
-								h[l].undoMove()
-					break
-			if isCollision == False: #no collision
-				break
-
-		for i in range(len(self.passengers)):
-			for j in xrange(i + 1, len(self.passengers)):
-				if self.passengers[i].x == self.passengers[j].x and self.passengers[i].y == self.passengers[j].y:
-					for p in h:
-						sys.stdout.write('(%s, %s) ' % (p.x, p.y))
-					print ''
-					pdb.set_trace()
-					print 'Collision at (%s, %s)' %(self.passengers[i].x, self.passengers[i].y)
-
-		#free memory
-		del h
 	def _show(self):
 		'''deprecated'''
 		for i in xrange(self.mapHeight - 1, -1, -1):
@@ -368,26 +336,6 @@ class Map(object):
 			else:
 				dy.append(thisy)
 
-			# if p.direction == 1: # up passengers
-			# 	if p.y - p.ly < 0: # leave boundary and enter boundary
-			# 		offset = 1 * (float(i % f) / f)
-			# 		if offset > 0.5: # entering boundary
-			# 			thisy = -0.5 + offset - 0.5
-			# 		else: # leaving boundary
-			# 			thisy = p.ly + offset
-			# 	else: # within boundary
-			# 		thisy = p.ly + (p.y - p.ly) * (float(i % f) / f)
-			# 	uy.append(thisy)
-			# elif p.direction == -1: # down passengers
-			# 	if p.y - p.ly > 0: # leave boundary and enter boundary
-			# 		offset = 1 * (float(i % f) / f)
-			# 		if offset > 0.5: # entering boundary
-			# 			thisy = self.mapHeight - offset 
-			# 		else: # leaving boundary
-			# 			thisy = p.ly - offset
-			# 	else: # within boundary
-			# 		thisy = p.ly + (p.y - p.ly) * (float(i % f) / f)
-			# 	dy.append(thisy)
 		self.udots.set_data(ux, uy)
 		self.ddots.set_data(dx, dy)
 		return self.udots, self.ddots
@@ -398,15 +346,44 @@ class Map(object):
 		return self.udots, self.ddots
 
 def main():
-	m = Map(20, 15, 5, 10)
-	m.setFrameInterval(50)
-	m.setStepInterval(500)
-	anim = animation.FuncAnimation(m.fig, m.animate, init_func = m.ani_init, frames = None, interval = m.frameInterval, blit = True)
-	# for i in range(1):
-	# 	m.show()
-	# 	print ''
-	# 	time.sleep(1)
-	# 	m.next()
-	plt.show()
+	try:
+		mapWidth = int(raw_input('Map width: '))
+		if mapWidth <= 0:
+			raise ValueError
+		mapHeight = int(raw_input('Map height: '))
+		if mapHeight <= 0:
+			raise ValueError
+		numUpPassenger = int(raw_input('Num of up people: '))
+		if numUpPassenger < 0:
+			raise ValueError
+		numDownPassenger = int(raw_input('Num of down people: '))
+		if numDownPassenger < 0:
+			raise ValueError
+		markerSize = int(raw_input('Size of marker (10 - 30 is recommended): '))
+		if markerSize < 0:
+			raise ValueError
+		iterationTime = int(raw_input('iteration times (100 - 500 is recommended): '))
+		if iterationTime < 0:
+			raise ValueError
+	except ValueError:
+		print 'Please enter a number bigger than 0.'
+		sys.exit(-1)
+	else:
+		m = Map(numUpPassenger, numDownPassenger, mapWidth, mapHeight, markerSize)
+		#m = Map(5,5,5,5)
+		for x in xrange(0,iterationTime):
+			if float(x) / iterationTime * 100 in range(0, 101):
+				os.system('cls')
+				print 'iterating... %s%%' % (float(x) / iterationTime * 100)
+			m.next()
+		os.system('cls')
+		print 'iteration finished.'
+		m.setFrameInterval(50)
+		m.setStepInterval(100)
+		percentage = m.statistics()
+		print 'Percentage of unmoved passengers after %sth iteration: %s%%' % (iterationTime, percentage * 100)
+		anim = animation.FuncAnimation(m.fig, m.animate, init_func = m.ani_init, frames = None, interval = m.frameInterval, blit = True)
+		plt.show()
+
 if __name__ == '__main__':
 	main()
